@@ -51,6 +51,17 @@ if [ ! -n "${BULLETTRAIN_TIME_FG+1}" ]; then
   BULLETTRAIN_TIME_FG=black
 fi
 
+# OS
+if [ ! -n "${BULLETTRAIN_OS_SHOW+1}" ]; then
+  BULLETTRAIN_OS_SHOW=true
+fi
+if [ ! -n "${BULLETTRAIN_OS_BG+1}" ]; then
+  BULLETTRAIN_OS_BG=green
+fi
+if [ ! -n "${BULLETTRAIN_OS_FG+1}" ]; then
+  BULLETTRAIN_OS_FG=white
+fi
+
 # VIRTUALENV
 if [ ! -n "${BULLETTRAIN_VIRTUALENV_SHOW+1}" ]; then
   BULLETTRAIN_VIRTUALENV_SHOW=true
@@ -371,6 +382,14 @@ prompt_time() {
   prompt_segment $BULLETTRAIN_TIME_BG $BULLETTRAIN_TIME_FG %D{%H:%M:%S}
 }
 
+prompt_os() {
+  if [[ $BULLETTRAIN_TIME_SHOW == false ]] then
+    return
+  fi
+
+  prompt_segment $BULLETTRAIN_OS_BG $BULLETTRAIN_OS_FG ${CURRENT_OS}
+}
+
 # Status:
 # - was there an error
 # - am I root
@@ -417,6 +436,7 @@ prompt_char() {
 
 build_prompt() {
   RETVAL=$?
+  prompt_os
   prompt_time
   prompt_status
   prompt_rvm
