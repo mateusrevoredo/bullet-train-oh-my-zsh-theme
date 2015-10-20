@@ -22,6 +22,12 @@ fi
 if [ ! -n "${BULLETTRAIN_PROMPT_ROOT+1}" ]; then
   BULLETTRAIN_PROMPT_ROOT=true
 fi
+if [ ! -n "${BULLETTRAIN_PROMPT_SEPARATE_LINE+1}" ]; then
+  BULLETTRAIN_PROMPT_SEPARATE_LINE=true
+fi
+if [ ! -n "${BULLETTRAIN_PROMPT_ADD_NEWLINE+1}" ]; then
+  BULLETTRAIN_PROMPT_ADD_NEWLINE=true
+fi
 
 # STATUS
 if [ ! -n "${BULLETTRAIN_STATUS_SHOW+1}" ]; then
@@ -90,18 +96,32 @@ if [ ! -n "${BULLETTRAIN_NVM_PREFIX+1}" ]; then
   BULLETTRAIN_NVM_PREFIX="⬡ "
 fi
 
-# RMV
-if [ ! -n "${BULLETTRAIN_RVM_SHOW+1}" ]; then
-  BULLETTRAIN_RVM_SHOW=true
+# RUBY
+if [ ! -n "${BULLETTRAIN_RUBY_SHOW+1}" ]; then
+  BULLETTRAIN_RUBY_SHOW=true
 fi
-if [ ! -n "${BULLETTRAIN_RVM_BG+1}" ]; then
-  BULLETTRAIN_RVM_BG=magenta
+if [ ! -n "${BULLETTRAIN_RUBY_BG+1}" ]; then
+  BULLETTRAIN_RUBY_BG=magenta
 fi
-if [ ! -n "${BULLETTRAIN_RVM_FG+1}" ]; then
-  BULLETTRAIN_RVM_FG=white
+if [ ! -n "${BULLETTRAIN_RUBY_FG+1}" ]; then
+  BULLETTRAIN_RUBY_FG=white
 fi
-if [ ! -n "${BULLETTRAIN_RVM_PREFIX+1}" ]; then
-  BULLETTRAIN_RVM_PREFIX=♦️
+if [ ! -n "${BULLETTRAIN_RUBY_PREFIX+1}" ]; then
+  BULLETTRAIN_RUBY_PREFIX=♦️
+fi
+
+# Go
+if [ ! -n "${BULLETTRAIN_GO_SHOW+1}" ]; then
+  BULLETTRAIN_GO_SHOW=false
+fi
+if [ ! -n "${BULLETTRAIN_GO_BG+1}" ]; then
+  BULLETTRAIN_GO_BG=cyan
+fi
+if [ ! -n "${BULLETTRAIN_GO_FG+1}" ]; then
+  BULLETTRAIN_GO_FG=white
+fi
+if [ ! -n "${BULLETTRAIN_GO_PREFIX+1}" ]; then
+  BULLETTRAIN_GO_PREFIX="go "
 fi
 
 # DIR
@@ -118,7 +138,7 @@ if [ ! -n "${BULLETTRAIN_DIR_CONTEXT_SHOW+1}" ]; then
   BULLETTRAIN_DIR_CONTEXT_SHOW=false
 fi
 if [ ! -n "${BULLETTRAIN_DIR_EXTENDED+1}" ]; then
-  BULLETTRAIN_DIR_EXTENDED=true
+  BULLETTRAIN_DIR_EXTENDED=1
 fi
 
 # GIT
@@ -268,7 +288,7 @@ prompt_context() {
 
 # Git
 prompt_git() {
-  if [[ $BULLETTRAIN_GIT_SHOW == false ]] then
+  if [[ $BULLETTRAIN_GIT_SHOW == false ]]; then
     return
   fi
 
@@ -278,7 +298,7 @@ prompt_git() {
   if $(git rev-parse --is-inside-work-tree >/dev/null 2>&1); then
     prompt_segment $BULLETTRAIN_GIT_BG $BULLETTRAIN_GIT_FG
 
-    if [[ $BULLETTRAIN_GIT_EXTENDED == true ]] then
+    if [[ $BULLETTRAIN_GIT_EXTENDED == true ]]; then
       echo -n $(git_prompt_info)$(git_prompt_status)
     else
       echo -n $(git_prompt_info)
@@ -323,50 +343,85 @@ prompt_hg() {
 
 # Dir: current working directory
 prompt_dir() {
-  if [[ $BULLETTRAIN_DIR_SHOW == false ]] then
+  if [[ $BULLETTRAIN_DIR_SHOW == false ]]; then
     return
   fi
 
   local dir=''
   local _context="$(context)"
   [[ $BULLETTRAIN_DIR_CONTEXT_SHOW == true && -n "$_context" ]] && dir="${dir}${_context}:"
-  [[ $BULLETTRAIN_DIR_EXTENDED == true ]] && dir="${dir}%4(c:...:)%3c" || dir="${dir}%1~"
+
+  if [[ $BULLETTRAIN_DIR_EXTENDED == 0 ]]; then
+    #short directories
+    dir="${dir}%1~"
+  elif [[ $BULLETTRAIN_DIR_EXTENDED == 2 ]]; then
+    #long directories
+    dir="${dir}%0~"
+  else
+    #medium directories (default case)
+    dir="${dir}%4(c:...:)%3c"
+  fi
+
   prompt_segment $BULLETTRAIN_DIR_BG $BULLETTRAIN_DIR_FG $dir
 }
 
-# RVM: only shows RVM info if on a gemset that is not the default one
-prompt_rvm() {
-  if [[ $BULLETTRAIN_RVM_SHOW == false ]] then
+# RUBY
+# RVM: only shows RUBY info if on a gemset that is not the default one
+# RBENV: shows current ruby version active in the shell
+# CHRUBY: shows current ruby version active in the shell
+prompt_ruby() {
+  if [[ $BULLETTRAIN_RUBY_SHOW == false ]]; then
     return
   fi
 
-  if which rvm-prompt &> /dev/null; then
+  if command -v rvm-prompt > /dev/null 2>&1; then
     if [[ ! -n $(rvm gemset list | grep "=> (default)") ]]
     then
-      prompt_segment $BULLETTRAIN_RVM_BG $BULLETTRAIN_RVM_FG $BULLETTRAIN_RVM_PREFIX"  $(rvm-prompt i v g)"
+      prompt_segment $BULLETTRAIN_RUBY_BG $BULLETTRAIN_RUBY_FG $BULLETTRAIN_RUBY_PREFIX" $(rvm-prompt i v g)"
+    fi
+  elif command -v chruby > /dev/null 2>&1; then
+    prompt_segment $BULLETTRAIN_RUBY_BG $BULLETTRAIN_RUBY_FG $BULLETTRAIN_RUBY_PREFIX"  $(chruby | sed -e 's/ \* //')"
+  elif command -v rbenv > /dev/null 2>&1; then
+    prompt_segment $BULLETTRAIN_RUBY_BG $BULLETTRAIN_RUBY_FG $BULLETTRAIN_RUBY_PREFIX" $(rbenv version | sed -e 's/ (set.*$//')"
+  fi
+}
+
+# Go
+prompt_go() {
+  if [[ $BULLETTRAIN_GO_SHOW == false ]]; then
+    return
+  fi
+
+  setopt extended_glob
+  if [[ (-f *.go(#qN) || -d Godeps || -f glide.yaml) ]]; then
+    if command -v go > /dev/null 2>&1; then
+      prompt_segment $BULLETTRAIN_GO_BG $BULLETTRAIN_GO_FG $BULLETTRAIN_GO_PREFIX" $(go version | grep --colour=never -oE '[[:digit:]].[[:digit:]]')"
     fi
   fi
 }
 
 # Virtualenv: current working virtualenv
 prompt_virtualenv() {
-  if [[ $BULLETTRAIN_VIRTUALENV_SHOW == false ]] then
+  if [[ $BULLETTRAIN_VIRTUALENV_SHOW == false ]]; then
     return
   fi
 
   local virtualenv_path="$VIRTUAL_ENV"
   if [[ -n $virtualenv_path && -n $VIRTUAL_ENV_DISABLE_PROMPT ]]; then
-    prompt_segment $BULLETTRAIN_VIRTUALENV_BG $BULLETTRAIN_VIRTUALENV_FG $BULLETTRAIN_VIRTUALENV_PREFIX"  $(basename $virtualenv_path)"
+    prompt_segment $BULLETTRAIN_VIRTUALENV_BG $BULLETTRAIN_VIRTUALENV_FG $BULLETTRAIN_VIRTUALENV_PREFIX" $(basename $virtualenv_path)"
+  elif which pyenv &> /dev/null; then
+    prompt_segment $BULLETTRAIN_VIRTUALENV_BG $BULLETTRAIN_VIRTUALENV_FG $BULLETTRAIN_VIRTUALENV_PREFIX" $(pyenv version | sed -e 's/ (set.*$//')"
   fi
 }
 
 # NVM: Node version manager
 prompt_nvm() {
-  if [[ $BULLETTRAIN_NVM_SHOW == false ]] then
+  if [[ $BULLETTRAIN_NVM_SHOW == false ]]; then
     return
   fi
 
-  [[ $(which nvm) != "nvm not found" ]] || return
+  $(type nvm >/dev/null 2>&1) || return
+
   local nvm_prompt
   nvm_prompt=$(node -v 2>/dev/null)
   [[ "${nvm_prompt}x" == "x" ]] && return
@@ -375,11 +430,15 @@ prompt_nvm() {
 }
 
 prompt_time() {
-  if [[ $BULLETTRAIN_TIME_SHOW == false ]] then
+  if [[ $BULLETTRAIN_TIME_SHOW == false ]]; then
     return
   fi
 
-  prompt_segment $BULLETTRAIN_TIME_BG $BULLETTRAIN_TIME_FG %D{%H:%M:%S}
+  if [[ $BULLETTRAIN_TIME_12HR == true ]]; then
+    prompt_segment $BULLETTRAIN_TIME_BG $BULLETTRAIN_TIME_FG %D{%r}
+  else
+    prompt_segment $BULLETTRAIN_TIME_BG $BULLETTRAIN_TIME_FG %D{%X}
+  fi
 }
 
 prompt_os() {
@@ -395,7 +454,7 @@ prompt_os() {
 # - am I root
 # - are there background jobs?
 prompt_status() {
-  if [[ $BULLETTRAIN_STATUS_SHOW == false ]] then
+  if [[ $BULLETTRAIN_STATUS_SHOW == false ]]; then
     return
   fi
 
@@ -406,9 +465,9 @@ prompt_status() {
   [[ $UID -eq 0 ]] && symbols+="%{%F{yellow}%}⚡%f"
   [[ $(jobs -l | wc -l) -gt 0 ]] && symbols+="⚙"
 
-  if [[ -n "$symbols" && $RETVAL -ne 0 ]] then
+  if [[ -n "$symbols" && $RETVAL -ne 0 ]]; then
     prompt_segment $BULLETTRAIN_STATUS_ERROR_BG $BULLETTRAIN_STATUS_FG "$symbols"
-  elif [[ -n "$symbols" ]] then
+  elif [[ -n "$symbols" ]]; then
     prompt_segment $BULLETTRAIN_STATUS_BG $BULLETTRAIN_STATUS_FG "$symbols"
   fi
 
@@ -417,18 +476,30 @@ prompt_status() {
 # Prompt Character
 prompt_char() {
   local bt_prompt_char
+  bt_prompt_char=""
 
-  if [[ ${#BULLETTRAIN_PROMPT_CHAR} -eq 1 ]] then
+  if [[ ${#BULLETTRAIN_PROMPT_CHAR} -eq 1 ]]; then
     bt_prompt_char="${BULLETTRAIN_PROMPT_CHAR}"
   fi
 
-  if [[ $BULLETTRAIN_PROMPT_ROOT == true ]] then
-    bt_prompt_char="%(!.%F{red}#.%F{green}${bt_prompt_char})"
+  if [[ $BULLETTRAIN_PROMPT_ROOT == true ]]; then
+    bt_prompt_char="%(!.%F{red}#.%F{green}${bt_prompt_char}%f)"
+  fi
+
+  if [[ $BULLETTRAIN_PROMPT_SEPARATE_LINE == false  ]]; then
+    bt_prompt_char=" ${bt_prompt_char}"
   fi
 
   echo -n $bt_prompt_char
 }
 
+# Prompt Line Separator
+prompt_line_sep() {
+  if [[ $BULLETTRAIN_PROMPT_SEPARATE_LINE == true ]]; then
+    # newline wont print without a non newline character, so add a zero-width space
+    echo -e '\n%{\u200B%}'
+  fi
+}
 # ------------------------------------------------------------------------------
 # MAIN
 # Entry point
@@ -439,16 +510,26 @@ build_prompt() {
   prompt_os
   prompt_time
   prompt_status
-  prompt_rvm
-  prompt_virtualenv
-  prompt_nvm
   prompt_context
   prompt_dir
+  prompt_ruby
+  prompt_virtualenv
+  prompt_nvm
+  prompt_go
   prompt_git
   # prompt_hg
   prompt_end
 }
 
-PROMPT='
+if [[ $BULLETTRAIN_PROMPT_SEPARATE_LINE == true ]]; then
+  if [[ $BULLETTRAIN_PROMPT_ADD_NEWLINE == true ]]; then
+    PROMPT='
 %{%f%b%k%}$(build_prompt)
 %{${fg_bold[default]}%}$(prompt_char) %{$reset_color%}'
+  else
+    PROMPT='%{%f%b%k%}$(build_prompt)
+%{${fg_bold[default]}%}$(prompt_char) %{$reset_color%}'
+  fi
+else
+  PROMPT='%{%f%b%k%}$(build_prompt)%{${fg_bold[default]}%} $(prompt_char) %{$reset_color%}'
+fi
